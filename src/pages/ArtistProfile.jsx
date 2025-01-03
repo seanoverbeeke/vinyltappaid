@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Box, 
   Container, 
@@ -18,7 +18,8 @@ import {
 } from '@mui/material'
 import {
   Instagram as InstagramIcon,
-  Language as WebIcon
+  Language as WebIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material'
 import { getArtist } from '../services/artistService'
 import Header from '../components/Header'
@@ -26,6 +27,7 @@ import MusicPlayer from '../components/MusicPlayer'
 
 function ArtistProfile() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const theme = useTheme()
   const [artist, setArtist] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +55,7 @@ function ArtistProfile() {
   if (loading) {
     return (
       <Box>
-        <Header title="Artist Profile" showAddButton={false} />
+        <Header showAddButton={false} />
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <CircularProgress />
         </Box>
@@ -64,7 +66,7 @@ function ArtistProfile() {
   if (error) {
     return (
       <Box>
-        <Header title="Artist Profile" showAddButton={false} />
+        <Header showAddButton={false} />
         <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
       </Box>
     )
@@ -74,8 +76,21 @@ function ArtistProfile() {
 
   return (
     <Box>
-      <Header title={artist.artistName} showAddButton={false} />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
+      <Header showAddButton={false} />
+      <Container maxWidth="lg" sx={{ mb: 8 }}>
+        {/* Back Button */}
+        <Box sx={{ mb: 1 }}>
+          <IconButton 
+            onClick={() => navigate('/artist-list')} 
+            sx={{ color: theme.palette.primary.main, p: 0 }}
+          >
+            <ArrowBackIcon />
+            <Typography variant="body1" sx={{ ml: 1, color: theme.palette.primary.main }}>
+              Back to Artist List
+            </Typography>
+          </IconButton>
+        </Box>
+
         {/* Hero Section */}
         <Paper 
           sx={{ 

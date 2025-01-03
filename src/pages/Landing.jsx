@@ -20,8 +20,7 @@ import {
   MicNone as MicIcon,
   AccountBox as ProfileIcon
 } from '@mui/icons-material';
-import React from "react";
-import Header from '../components/Header';
+import React, { useRef } from "react";
 import { useNavigate } from 'react-router-dom';
 
 const StyledButton = styled(Button)(({ theme }) => ({
@@ -44,9 +43,14 @@ const CustomIcon = ({ src, alt, size = 40 }) => (
 
 const Landing = () => {
   const navigate = useNavigate();
+  const featuresRef = useRef(null);
 
   const handleGetStarted = () => {
     navigate('/login');
+  };
+
+  const handleLearnMore = () => {
+    featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const features = [
@@ -69,8 +73,6 @@ const Landing = () => {
 
   return (
     <Box sx={{ width: "100%", bgcolor: "#121212" }}>
-      <Header showAddButton={false} />
-      
       {/* Hero Section */}
       <Container sx={{ py: 8 }}>
         <Grid container spacing={4} alignItems="center">
@@ -85,7 +87,7 @@ const Landing = () => {
               <StyledButton variant="contained" color="success" sx={{ width: 200 }} onClick={handleGetStarted}>
                 Get Started Now
               </StyledButton>
-              <StyledButton variant="outlined" color="inherit" sx={{ width: 200 }}>
+              <StyledButton variant="outlined" color="inherit" sx={{ width: 200 }} onClick={handleLearnMore}>
                 Learn More
               </StyledButton>
             </Box>
@@ -104,57 +106,29 @@ const Landing = () => {
       </Container>
 
       {/* Features Section */}
-      <Box sx={{ bgcolor: "#181818", py: 8 }}>
+      <Box ref={featuresRef} sx={{ bgcolor: "#181818", py: 8 }}>
         <Container>
           <Typography variant="h4" color="white" align="center" sx={{ fontWeight: "bold", mb: 4 }}>
             Why Choose Vinyl Tap?
           </Typography>
           <Grid container spacing={4}>
-            <Grid item xs={12} md={4}>
-              <Card sx={{ bgcolor: "#282828", borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <MicIcon sx={{ fontSize: 40, color: '#1DB954', mr: 1 }} />
-                    <Typography variant="h6" color="white" sx={{ fontWeight: "bold" }}>
-                      Beautiful, Customizable Profiles
+            {features.map((feature, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Card sx={{ bgcolor: "#282828", borderRadius: 2 }}>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      {feature.icon}
+                      <Typography variant="h6" color="white" sx={{ fontWeight: "bold", ml: 1 }}>
+                        {feature.title}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="gray">
+                      {feature.description}
                     </Typography>
-                  </Box>
-                  <Typography variant="body2" color="gray">
-                    Showcase your music, videos, photos, and biography in a sleek and professional layout.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card sx={{ bgcolor: "#282828", borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <QrCodeIcon sx={{ fontSize: 40, color: '#1DB954', mr: 1 }} />
-                    <Typography variant="h6" color="white" sx={{ fontWeight: "bold" }}>
-                      Seamless QR Code Sharing
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="gray">
-                    Instantly generate QR codes that link directly to your EPK.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card sx={{ bgcolor: "#282828", borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <LibraryMusicIcon sx={{ fontSize: 40, color: '#1DB954', mr: 1 }} />
-                    <Typography variant="h6" color="white" sx={{ fontWeight: "bold" }}>
-                      All Your Content in One Place
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="gray">
-                    Upload your music, images, and videos in one centralized hub.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
         </Container>
       </Box>
@@ -192,8 +166,11 @@ const Landing = () => {
                     borderRadius: "50%",
                     mx: "auto",
                     mb: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
                   }}>
-                    <Typography variant="h4" color="black" sx={{ lineHeight: "64px" }}>
+                    <Typography variant="h4" color="black">
                       {item.step}
                     </Typography>
                   </Box>
@@ -218,22 +195,10 @@ const Landing = () => {
           </Typography>
           <Grid container spacing={4} justifyContent="center">
             {[
-              { 
-                icon: <PersonIcon sx={{ fontSize: 40, color: '#1DB954' }} />, 
-                text: "Independent Artists" 
-              },
-              { 
-                icon: <GroupIcon sx={{ fontSize: 40, color: '#1DB954' }} />, 
-                text: "Bands" 
-              },
-              { 
-                icon: <HeadphonesIcon sx={{ fontSize: 40, color: '#1DB954' }} />, 
-                text: "DJs" 
-              },
-              { 
-                icon: <BusinessIcon sx={{ fontSize: 40, color: '#1DB954' }} />, 
-                text: "Managers & Promoters" 
-              }
+              { icon: <PersonIcon sx={{ fontSize: 40, color: '#1DB954' }} />, text: "Independent Artists" },
+              { icon: <GroupIcon sx={{ fontSize: 40, color: '#1DB954' }} />, text: "Bands" },
+              { icon: <HeadphonesIcon sx={{ fontSize: 40, color: '#1DB954' }} />, text: "DJs" },
+              { icon: <BusinessIcon sx={{ fontSize: 40, color: '#1DB954' }} />, text: "Managers & Promoters" }
             ].map((item, index) => (
               <Grid item xs={12} md={3} sx={{ textAlign: "center" }} key={index}>
                 {item.icon}
