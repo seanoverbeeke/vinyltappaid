@@ -11,20 +11,23 @@ import {
 } from '@mui/material'
 import { 
   Menu as MenuIcon,
-  Home as HomeIcon,
-  Search as SearchIcon,
-  List as ListIcon,
-  Logout as LogoutIcon
+  Info as InfoIcon,
+  Policy as PolicyIcon,
+  Logout as LogoutIcon,
+  Login as LoginIcon,
+  CreditCard as BillingIcon
 } from '@mui/icons-material'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthenticator } from '@aws-amplify/ui-react'
 
 function Navigation() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [anchorEl, setAnchorEl] = useState(null)
   const open = Boolean(anchorEl)
-  const { signOut } = useAuthenticator()
+  const { user, signOut } = useAuthenticator()
+  const isPublicPage = location.pathname === '/' || location.pathname === '/login'
 
   const handleLogout = async () => {
     try {
@@ -38,13 +41,31 @@ function Navigation() {
     }
   }
 
-  const menuItems = [
-    { text: 'Landing', icon: <HomeIcon />, path: '/' },
-    { text: 'Artist List', icon: <ListIcon />, path: '/artist-list' },
-    { text: 'Search', icon: <SearchIcon />, path: '/search' },
-    { divider: true },
-    { text: 'Logout', icon: <LogoutIcon />, onClick: handleLogout }
-  ]
+  const getMenuItems = () => {
+    const items = [
+      { text: 'About', icon: <InfoIcon />, onClick: () => handleClose() },
+      { text: 'Privacy', icon: <PolicyIcon />, onClick: () => handleClose() },
+    ]
+
+    if (user && !isPublicPage) {
+      items.push(
+        { text: 'Billing', icon: <BillingIcon />, onClick: () => handleClose() }
+      )
+    }
+
+    if (user) {
+      items.push(
+        { divider: true },
+        { text: 'Logout', icon: <LogoutIcon />, onClick: handleLogout }
+      )
+    } else {
+      items.push(
+        { divider: true },
+        { text: 'Login', icon: <LoginIcon />, onClick: () => handleMenuItemClick('/login') }
+      )
+    }
+    return items
+  }
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget)
@@ -55,7 +76,9 @@ function Navigation() {
   }
 
   const handleMenuItemClick = (path) => {
-    navigate(path)
+    if (path) {
+      navigate(path)
+    }
     handleClose()
   }
 
@@ -77,10 +100,12 @@ function Navigation() {
         <Typography 
           variant="h6" 
           component="div" 
+          onClick={() => navigate('/')}
           sx={{ 
             flexGrow: 1,
             fontWeight: 700,
-            color: 'primary.main'
+            color: 'primary.main',
+            cursor: 'pointer'
           }}
         >
           Vinyl Tap
@@ -97,51 +122,32 @@ function Navigation() {
         >
           <MenuIcon />
         </IconButton>
+        <Menu
+          id="menu-dropdown"
+          anchorEl={anchorEl}
+          open={open}
+          onClose={handleClose}
+          MenuListProps={{
+            'aria-labelledby': 'menu-button',
+          }}
+        >
+          {getMenuItems().map((item, index) => (
+            item.divider ? (
+              <Divider key={`divider-${index}`} />
+            ) : (
+              <MenuItem
+                key={item.text}
+                onClick={() => item.onClick ? item.onClick() : handleMenuItemClick(item.path)}
+              >
+                <ListItemIcon>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText>{item.text}</ListItemText>
+              </MenuItem>
+            )
+          ))}
+        </Menu>
       </Toolbar>
-
-      <Menu
-        id="menu-dropdown"
-        anchorEl={anchorEl}
-        open={open}
-        onClose={handleClose}
-        onClick={handleClose}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        PaperProps={{
-          elevation: 0,
-          sx: {
-            overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-            mt: 1.5,
-            backgroundColor: 'background.paper',
-            '& .MuiMenuItem-root': {
-              px: 2,
-              py: 1.5,
-            },
-          },
-        }}
-      >
-        {menuItems.map((item) => (
-          item.divider ? (
-            <Divider key="divider" sx={{ my: 1 }} />
-          ) : (
-            <MenuItem 
-              key={item.text} 
-              onClick={() => item.onClick ? item.onClick() : handleMenuItemClick(item.path)}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                },
-              }}
-            >
-              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 36 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </MenuItem>
-          )
-        ))}
-      </Menu>
     </AppBar>
   )
 }

@@ -2,7 +2,6 @@ import React from 'react';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { Box, Container } from '@mui/material';
-import Header from '../components/Header';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -12,13 +11,54 @@ const Login = () => {
     signIn: {
       username: {
         label: 'Email',
-        placeholder: 'Enter your email'
+        placeholder: 'Enter your email',
+        isRequired: true,
+        type: 'email'
       }
     },
     signUp: {
       username: {
         label: 'Email',
-        placeholder: 'Enter your email'
+        placeholder: 'Enter your email',
+        isRequired: true,
+        type: 'email',
+        order: 1
+      },
+      password: {
+        label: 'Password',
+        placeholder: 'Enter your password',
+        isRequired: true,
+        type: 'password',
+        order: 2
+      },
+      confirm_password: {
+        label: 'Confirm Password',
+        placeholder: 'Please confirm your password',
+        order: 3
+      }
+    },
+    confirmSignUp: {
+      username: {
+        label: 'Email',
+        placeholder: 'Enter your email',
+        isRequired: true,
+        type: 'email'
+      }
+    },
+    resetPassword: {
+      username: {
+        label: 'Email',
+        placeholder: 'Enter your email',
+        isRequired: true,
+        type: 'email'
+      }
+    },
+    confirmResetPassword: {
+      username: {
+        label: 'Email',
+        placeholder: 'Enter your email',
+        isRequired: true,
+        type: 'email'
       }
     }
   };
@@ -34,7 +74,6 @@ const Login = () => {
 
   return (
     <Box sx={{ width: "100%", bgcolor: "#121212" }}>
-      <Header showAddButton={false} />
       <Container 
         sx={{ 
           py: 8,
@@ -48,30 +87,23 @@ const Login = () => {
           '--amplify-components-button-primary-background-color': '#1DB954',
           '--amplify-components-button-primary-hover-background-color': '#1ed760',
           '--amplify-components-tabs-item-active-color': '#1DB954',
+          '--amplify-components-tabs-item-focus-color': '#1DB954',
           '--amplify-components-tabs-item-hover-color': '#1ed760',
-          '--amplify-components-text-color': '#000000',
-          '--amplify-components-link-color': '#000000',
-          '& .amplify-button[data-variation="link"]': {
-            color: '#000000 !important'
-          },
-          '& .amplify-authenticator__link': {
-            color: '#000000 !important'
-          },
-          '& .amplify-button--link': {
-            color: '#000000 !important'
-          },
-          '& [data-amplify-router-content] a': {
-            color: '#000000 !important'
+          '& [data-amplify-authenticator] [name="email"]': {
+            display: 'none'
           }
         }}
       >
         <Authenticator
           formFields={formFields}
           components={components}
+          hideSignUp={false}
+          loginMechanisms={['username']}
         >
           {({ signOut, user }) => {
             if (user) {
               navigate('/artist-list');
+              return null;
             }
             return null;
           }}

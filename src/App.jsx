@@ -5,6 +5,7 @@ import { theme } from './theme'
 import Navigation from './components/Navigation'
 import AppRoutes from './AppRoutes'
 import { Authenticator } from '@aws-amplify/ui-react'
+import '@aws-amplify/ui-react/styles.css'
 
 function App() {
   return (

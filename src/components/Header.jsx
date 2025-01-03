@@ -17,8 +17,7 @@ function Header({ title, showAddButton = false }) {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        mb: 3,
-        mt: 1
+        py: 1
       }}
     >
       <Typography 
