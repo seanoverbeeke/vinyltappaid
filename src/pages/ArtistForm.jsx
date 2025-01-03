@@ -194,7 +194,17 @@ function ArtistForm() {
     try {
       setLoading(true);
       console.log('Starting upload process for:', { file, type, artistId });
-      const fileName = `${type}/${index !== null ? index + 1 : 1}.jpg`;
+      
+      // Get original file extension and create clean file name
+      const originalFileName = file.name;
+      const fileExtension = originalFileName.split('.').pop().toLowerCase();
+      const cleanFileName = originalFileName
+        .toLowerCase()
+        .replace(/[^a-z0-9.]/g, '-');
+        
+      // Create the full path
+      const fileName = `${type}/${cleanFileName}`;
+      
       console.log('Requesting upload URL for:', fileName);
 
       const { uploadUrl, fileUrl } = await getUploadUrl(artistId, fileName, file.type);
@@ -229,7 +239,7 @@ function ArtistForm() {
             });
           });
         } else {
-          // Gallery image - make sure we have a gallery array
+          // Gallery image
           newData = await new Promise(resolve => {
             setFormData(prev => {
               const gallery = Array.isArray(prev.gallery) ? [...prev.gallery] : [];
@@ -252,7 +262,7 @@ function ArtistForm() {
           setFormData(prev => {
             const newAudioFiles = Array.isArray(prev.audioFiles) ? [...prev.audioFiles] : [];
             if (!newAudioFiles[index]) {
-              newAudioFiles[index] = { title: '', id: `song${index + 1}` };
+              newAudioFiles[index] = { title: originalFileName.replace(`.${fileExtension}`, ''), id: `song${index + 1}` };
             }
             newAudioFiles[index] = {
               ...newAudioFiles[index],
