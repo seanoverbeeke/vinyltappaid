@@ -1,0 +1,189 @@
+import json
+import boto3
+
+def lambda_handler(event, context):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('vinyltapdb')
+    s3 = boto3.client('s3')
+    bucket_name = 'vinyltapbucket001'  # Your S3 bucket name
+    
+    try:
+        # Get the HTTP method
+        http_method = event.get('httpMethod', event.get('requestContext', {}).get('http', {}).get('method', ''))
+        
+        # Handle "Generate Upload URL" operation (POST with action=getUploadUrl)
+        if http_method == 'POST' and event.get('queryStringParameters', {}).get('action') == 'getUploadUrl':
+            data = json.loads(event['body'])
+            artist_id = data.get('artistId')
+            file_name = data.get('fileName')
+            file_type = data.get('fileType')
+            
+            if not all([artist_id, file_name, file_type]):
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    'body': 'Missing required fields: artistId, fileName, fileType'
+                }
+            
+            # Generate a pre-signed URL for uploading
+            try:
+                key = f"{artist_id.replace('-', '').lower()}/{file_name}"
+                upload_url = s3.generate_presigned_url(
+                    'put_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': key,
+                        'ContentType': file_type
+                    },
+                    ExpiresIn=3600  # URL expires in 1 hour
+                )
+                
+                file_url = f"https://{bucket_name}.s3.amazonaws.com/{key}"
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    'body': json.dumps({
+                        'uploadUrl': upload_url,
+                        'fileUrl': file_url
+                    })
+                }
+            except Exception as e:
+                return {
+                    'statusCode': 500,
+                    'headers': {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    'body': f"Error generating upload URL: {str(e)}"
+                }
+        
+        # Handle "Create" operation (POST without action)
+        elif http_method == 'POST' and not event.get('queryStringParameters', {}).get('action'):
+            new_artist = json.loads(event['body'])
+            if not new_artist.get('artistId') or not new_artist.get('artistName'):
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    'body': 'Missing required fields: artistId and artistName'
+                }
+            
+            # Add artist to DynamoDB
+            table.put_item(Item=new_artist)
+            
+            # Create artist folder and subfolders in S3
+            artist_folder = f"{new_artist['artistId'].replace('-', '').lower()}/"  # Normalize folder name
+            subfolders = ["images/", "music/"]
+            for subfolder in subfolders:
+                folder_path = f"{artist_folder}{subfolder}"
+                s3.put_object(Bucket=bucket_name, Key=folder_path)
+            
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type'
+                },
+                'body': f"Artist added successfully! Folders created: {artist_folder} with subfolders {subfolders}"
+            }
+        
+        # Handle "Read All Artists" (GET without query parameters)
+        elif http_method == 'GET' and not event.get('queryStringParameters'):
+            response = table.scan()
+            items = response.get('Items', [])
+            return {
+                'statusCode': 200,
+                'body': json.dumps(items)
+            }
+        
+        # Handle "Read" operation (GET with query parameters)
+        elif http_method == 'GET':
+            artist_id = event['queryStringParameters'].get('artistId')
+            if not artist_id:
+                return {
+                    'statusCode': 400,
+                    'body': 'Missing required field: artistId'
+                }
+            response = table.get_item(Key={'artistId': artist_id})
+            if 'Item' not in response:
+                return {
+                    'statusCode': 404,
+                    'body': 'Artist not found'
+                }
+            return {
+                'statusCode': 200,
+                'body': json.dumps(response['Item'])
+            }
+        
+        # Handle "Update" operation (PUT)
+        elif http_method == 'PUT':
+            data = json.loads(event['body'])
+            artist_id = data.get('artistId')
+            updates = data.get('updates')
+            if not artist_id or not updates:
+                return {
+                    'statusCode': 400,
+                    'body': 'Missing required fields: artistId and updates'
+                }
+            response = table.get_item(Key={'artistId': artist_id})
+            if 'Item' not in response:
+                return {
+                    'statusCode': 404,
+                    'body': 'Artist not found'
+                }
+            existing_item = response['Item']
+            for key, value in updates.items():
+                if isinstance(value, dict) and key in existing_item and isinstance(existing_item[key], dict):
+                    existing_item[key].update(value)
+                else:
+                    existing_item[key] = value
+            table.put_item(Item=existing_item)
+            return {
+                'statusCode': 200,
+                'body': 'Artist updated successfully!'
+            }
+        
+        # Handle "Delete" operation (DELETE)
+        elif http_method == 'DELETE':
+            artist_id = event['queryStringParameters'].get('artistId')
+            if not artist_id:
+                return {
+                    'statusCode': 400,
+                    'body': 'Missing required field: artistId'
+                }
+            table.delete_item(Key={'artistId': artist_id})
+            artist_folder = f"{artist_id.replace('-', '').lower()}/"
+            objects_to_delete = s3.list_objects_v2(Bucket=bucket_name, Prefix=artist_folder).get('Contents', [])
+            delete_keys = [{'Key': obj['Key']} for obj in objects_to_delete]
+            if delete_keys:
+                s3.delete_objects(Bucket=bucket_name, Delete={'Objects': delete_keys})
+            return {
+                'statusCode': 200,
+                'body': f"Artist deleted successfully! Folder {artist_folder} removed."
+            }
+        
+        else:
+            return {
+                'statusCode': 405,
+                'body': f"Method {http_method} not allowed"
+            }
+    
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': f"Error: {str(e)}"
+        }
