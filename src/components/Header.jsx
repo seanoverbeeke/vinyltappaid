@@ -1,8 +1,15 @@
 import { Box, Typography, Button } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { useAuthenticator } from '@aws-amplify/ui-react'
 
-function Header({ title, showAddButton = true }) {
+function Header({ title, showAddButton = false }) {
   const navigate = useNavigate()
+  const { user } = useAuthenticator()
+  
+  const handleAddClick = () => {
+    // User is already authenticated, just navigate directly to create form
+    navigate('/create', { replace: true })
+  }
 
   return (
     <Box 
@@ -27,7 +34,7 @@ function Header({ title, showAddButton = true }) {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => navigate('/create')}
+          onClick={handleAddClick}
           size="small"
         >
           Add New Artist

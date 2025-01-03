@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useAuthenticator } from '@aws-amplify/ui-react'
 import {
   TextField,
   Button,
@@ -20,7 +19,6 @@ import Header from '../components/Header'
 function ArtistForm() {
   const { artistId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuthenticator()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [qrLoading, setQrLoading] = useState(false)
@@ -68,10 +66,6 @@ function ArtistForm() {
     setError('')
 
     try {
-      if (!user?.signInDetails?.loginId) {
-        throw new Error('You must be logged in to create an artist')
-      }
-
       // Validate artistId format - now allowing hyphens
       const artistIdPattern = /^[a-z0-9-]+$/
       if (!artistId && !artistIdPattern.test(formData.artistId)) {
@@ -93,8 +87,7 @@ function ArtistForm() {
           fact3: formData.quickFacts?.fact3 || '',
         },
         gallery: formData.gallery || [],
-        audioFiles: formData.audioFiles || [],
-        userId: user.signInDetails.loginId
+        audioFiles: formData.audioFiles || []
       }
 
       if (artistId) {
@@ -104,8 +97,8 @@ function ArtistForm() {
         await createArtist(cleanFormData)
       }
 
-      // Navigate to artist list after successful save
-      navigate('/artist-list')
+      // Only navigate after successful save
+      navigate('/')
     } catch (err) {
       console.error('Form submission error:', err)
       setError(err.message || 'Failed to save artist')

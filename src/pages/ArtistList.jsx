@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   Box,
   Table,
@@ -23,9 +23,11 @@ import {
   Visibility as ViewIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Add as AddIcon,
 } from '@mui/icons-material'
 import { getAllArtists, deleteArtist } from '../services/artistService'
 import Header from '../components/Header'
+import { useAuthenticator } from '@aws-amplify/ui-react'
 
 console.log('ArtistList.jsx is loading')
 
@@ -39,17 +41,26 @@ function ArtistList() {
   const [selectedArtist, setSelectedArtist] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const { user } = useAuthenticator()
+
+  console.log('Current user:', user);
 
   const fetchArtists = async () => {
     console.log('Fetching artists...')
     try {
       const fetchedArtists = await getAllArtists()
-      console.log('Fetched artists:', fetchedArtists)
-      setArtists(fetchedArtists || [])
+      console.log('Raw fetched artists:', fetchedArtists)
+      
+      const userArtists = user?.signInDetails?.loginId 
+        ? fetchedArtists.filter(artist => artist.userId === user.signInDetails.loginId)
+        : [];
+        
+      console.log('Filtered user artists:', userArtists)
+      setArtists(userArtists)
       setError('')
-    } catch (err) {
-      console.error('Error fetching artists:', err)
-      setError('Failed to fetch artists: ' + (err.message || 'Unknown error'))
+    } catch (error) {
+      console.error('Error fetching artists:', error)
+      setError('Failed to fetch artists: ' + (error.message || 'Unknown error'))
       setArtists([])
     } finally {
       setLoading(false)
@@ -57,20 +68,23 @@ function ArtistList() {
   }
 
   useEffect(() => {
-    console.log('ArtistList useEffect running')
-    setLoading(true)
-    setError('')
-    fetchArtists()
-  }, [retryCount])
+    // Check for loginId instead of attributes.email
+    if (user?.signInDetails?.loginId) {
+      console.log('ArtistList useEffect running')
+      setLoading(true)
+      setError('')
+      fetchArtists()
+    }
+  }, [user])
 
   const handleEdit = (artistId) => {
     console.log('Navigating to edit:', artistId)
-    navigate(`/edit/${artistId}`)
+    navigate(`/artist-form/${artistId}`)
   }
 
   const handleView = (artistId) => {
     console.log('Navigating to profile:', artistId)
-    navigate(`/profile/${artistId}`)
+    navigate(`/artist/${artistId}`)
   }
 
   const handleDeleteClick = (artist) => {
@@ -97,6 +111,10 @@ function ArtistList() {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false)
     setSelectedArtist(null)
+  }
+
+  const handleAddNew = () => {
+    navigate('/artist-form');
   }
 
   const renderContent = () => {
@@ -185,7 +203,19 @@ function ArtistList() {
 
   return (
     <Box>
-      <Header title="Artists" />
+      <Header title="Artists" showAddButton={false} />
+      
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={handleAddNew}
+        >
+          Add New Artist
+        </Button>
+      </Box>
+
       {renderContent()}
       <Dialog 
         open={deleteDialogOpen} 

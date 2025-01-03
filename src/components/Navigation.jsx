@@ -7,27 +7,43 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Divider
 } from '@mui/material'
 import { 
   Menu as MenuIcon,
   Home as HomeIcon,
   Search as SearchIcon,
-  Settings as SettingsIcon,
-  Info as InfoIcon
+  List as ListIcon,
+  Logout as LogoutIcon
 } from '@mui/icons-material'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuthenticator } from '@aws-amplify/ui-react'
 
 function Navigation() {
   const navigate = useNavigate()
   const [anchorEl, setAnchorEl] = useState(null)
   const open = Boolean(anchorEl)
+  const { signOut } = useAuthenticator()
+
+  const handleLogout = async () => {
+    try {
+      handleClose()
+      signOut()
+      localStorage.clear()
+      sessionStorage.clear()
+      navigate('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
 
   const menuItems = [
-    { text: 'Home', icon: <HomeIcon />, path: '/' },
+    { text: 'Landing', icon: <HomeIcon />, path: '/' },
+    { text: 'Artist List', icon: <ListIcon />, path: '/artist-list' },
     { text: 'Search', icon: <SearchIcon />, path: '/search' },
-    { text: 'About', icon: <InfoIcon />, path: '/about' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { divider: true },
+    { text: 'Logout', icon: <LogoutIcon />, onClick: handleLogout }
   ]
 
   const handleClick = (event) => {
@@ -67,7 +83,7 @@ function Navigation() {
             color: 'primary.main'
           }}
         >
-          Vinyl Tap Admin
+          Vinyl Tap
         </Typography>
         <IconButton
           size="large"
@@ -106,20 +122,24 @@ function Navigation() {
         }}
       >
         {menuItems.map((item) => (
-          <MenuItem 
-            key={item.text} 
-            onClick={() => handleMenuItemClick(item.path)}
-            sx={{
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.1)',
-              },
-            }}
-          >
-            <ListItemIcon sx={{ color: 'text.secondary', minWidth: 36 }}>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </MenuItem>
+          item.divider ? (
+            <Divider key="divider" sx={{ my: 1 }} />
+          ) : (
+            <MenuItem 
+              key={item.text} 
+              onClick={() => item.onClick ? item.onClick() : handleMenuItemClick(item.path)}
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 36 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </MenuItem>
+          )
         ))}
       </Menu>
     </AppBar>

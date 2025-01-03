@@ -25,30 +25,28 @@ import Header from '../components/Header'
 import MusicPlayer from '../components/MusicPlayer'
 
 function ArtistProfile() {
-  const { id } = useParams()
+  const { artistId } = useParams()
   const theme = useTheme()
   const [artist, setArtist] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const loadArtist = async () => {
-      try {
-        setLoading(true)
-        const data = await getArtist(id)
-        setArtist(data)
-      } catch (err) {
-        setError('Failed to load artist profile')
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
+    loadArtist()
+  }, [artistId])
 
-    if (id) {
-      loadArtist()
+  const loadArtist = async () => {
+    try {
+      setLoading(true)
+      const data = await getArtist(artistId)
+      setArtist(data)
+    } catch (err) {
+      setError('Failed to load artist profile')
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-  }, [id])
+  }
 
   if (loading) {
     return (

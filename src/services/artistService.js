@@ -22,44 +22,24 @@ const retryFetch = async (fn, retries = 3, delay = 1000) => {
   }
 }
 
-export const getAllArtists = async (skipCache = false) => {
-  // Check cache first
-  if (!skipCache && 
-      artistsCache.data && 
-      artistsCache.timestamp && 
-      Date.now() - artistsCache.timestamp < artistsCache.CACHE_DURATION) {
-    console.log('Returning cached artists data');
-    return artistsCache.data;
-  }
-
-  return retryFetch(async () => {
-    try {
-      const response = await fetch(BASE_URL, {
-        method: 'GET',
-        headers
-      });
-      
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Failed to fetch artists: ${text}`);
-      }
-      
-      const data = await response.json();
-      
-      // Update cache
-      artistsCache = {
-        ...artistsCache,
-        data,
-        timestamp: Date.now()
-      };
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching all artists:', error);
-      throw error;
+export const getAllArtists = async () => {
+  try {
+    const response = await fetch(BASE_URL, {
+      method: 'GET',
+      headers
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch artists');
     }
-  });
-}
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in getAllArtists:', error);
+    throw error;
+  }
+};
 
 // Clear cache after mutations
 const clearCache = () => {
