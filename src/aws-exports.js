@@ -23,8 +23,8 @@ const awsconfig = {
       domain: 'us-east-1bfdpg2rtb.auth.us-east-1.amazoncognito.com',
       scope: ['phone', 'email', 'openid', 'profile'],
       // Add both dev and production URLs, separated by a comma:
-      redirectSignIn: 'http://localhost:5173,https://app.vinyltapit.com',
-      redirectSignOut: 'http://localhost:5173,https://app.vinyltapit.com',
+      redirectSignIn: 'http://localhost:5173,https://www.vinyltapit.com',
+      redirectSignOut: 'http://localhost:5173,https://www.vinyltapit.com',
       responseType: 'code'
     }
   }
