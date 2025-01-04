@@ -22,8 +22,9 @@ const awsconfig = {
     oauth: {
       domain: 'us-east-1bfdpg2rtb.auth.us-east-1.amazoncognito.com',
       scope: ['phone', 'email', 'openid', 'profile'],
-      redirectSignIn: 'https://d84l1y8p4kdic.cloudfront.net',
-      redirectSignOut: 'https://d84l1y8p4kdic.cloudfront.net',
+      // Add both dev and production URLs, separated by a comma:
+      redirectSignIn: 'http://localhost:5173,https://app.vinyltapit.com',
+      redirectSignOut: 'http://localhost:5173,https://app.vinyltapit.com',
       responseType: 'code'
     }
   }
