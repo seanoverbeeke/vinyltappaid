@@ -28,6 +28,21 @@ function MusicPlayer({ tracks = [], artistName }) {
   const [prevVolume, setPrevVolume] = useState(0.8)
   const [isSeeking, setIsSeeking] = useState(false)
   const audioRef = useRef(new Audio())
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volumeRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (volumeRef.current && !volumeRef.current.contains(event.target)) {
+        setShowVolumeSlider(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (tracks.length > 0) {
@@ -178,7 +193,7 @@ function MusicPlayer({ tracks = [], artistName }) {
             flexShrink: 0
           }}
         >
-          <PlayIcon sx={{ fontSize: 30, color: theme.palette.primary.main }} />
+          <NoteIcon sx={{ fontSize: 30, color: theme.palette.primary.main }} />
         </Box>
         <Box>
           <Typography 
@@ -249,10 +264,79 @@ function MusicPlayer({ tracks = [], artistName }) {
         direction="row" 
         spacing={0} 
         alignItems="center" 
-        justifyContent="space-between" 
+        justifyContent="space-between"
         sx={{ mb: 3 }}
       >
-        <Box sx={{ width: 100 }} /> {/* Spacer */}
+        {/* Volume Control */}
+        <Box 
+          ref={volumeRef}
+          sx={{ 
+            position: 'relative',
+            minWidth: 40
+          }}
+        >
+          <IconButton 
+            onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+            sx={{ 
+              color: theme.palette.text.secondary,
+              '&:hover': { color: theme.palette.text.primary }
+            }}
+          >
+            {volume === 0 ? <MuteIcon /> : <VolumeIcon />}
+          </IconButton>
+          
+          {showVolumeSlider && (
+            <Paper
+              elevation={4}
+              sx={{
+                position: 'absolute',
+                bottom: '120%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                p: 2,
+                height: 120,
+                display: 'flex',
+                alignItems: 'center',
+                zIndex: 1,
+                backgroundColor: theme.palette.background.paper,
+                animation: 'fadeIn 0.2s ease',
+                '@keyframes fadeIn': {
+                  from: { opacity: 0, transform: 'translateX(-50%) translateY(10px)' },
+                  to: { opacity: 1, transform: 'translateX(-50%) translateY(0)' }
+                }
+              }}
+            >
+              <Slider
+                value={volume * 100}
+                onChange={handleVolumeChange}
+                orientation="vertical"
+                aria-label="Volume"
+                sx={{
+                  color: theme.palette.primary.main,
+                  '& .MuiSlider-thumb': {
+                    width: 8,
+                    height: 8,
+                    '&:before': {
+                      boxShadow: '0 2px 12px 0 rgba(0,0,0,0.4)',
+                    },
+                    '&:hover, &.Mui-focusVisible': {
+                      boxShadow: `0px 0px 0px 8px ${theme.palette.primary.main}33`
+                    },
+                    '&.Mui-active': {
+                      width: 12,
+                      height: 12
+                    }
+                  },
+                  '& .MuiSlider-rail': {
+                    opacity: 0.28
+                  }
+                }}
+              />
+            </Paper>
+          )}
+        </Box>
+
+        {/* Playback Controls */}
         <Stack direction="row" spacing={1} alignItems="center">
           <IconButton 
             onClick={handlePrevious}
@@ -287,70 +371,9 @@ function MusicPlayer({ tracks = [], artistName }) {
             <NextIcon />
           </IconButton>
         </Stack>
-        <Stack 
-          direction="row" 
-          spacing={1} 
-          alignItems="center" 
-          sx={{ 
-            width: 100,
-            position: 'relative'
-          }}
-        >
-          <IconButton 
-            onClick={handleVolumeClick}
-            sx={{ 
-              color: theme.palette.text.secondary,
-              '&:hover': { color: theme.palette.text.primary }
-            }}
-          >
-            {volume === 0 ? <MuteIcon /> : <VolumeIcon />}
-          </IconButton>
-          <Box
-            sx={{
-              position: 'absolute',
-              right: 0,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: 0,
-              overflow: 'hidden',
-              transition: 'width 0.2s ease-in-out',
-              '.MuiStack-root:hover &': {
-                width: 100
-              }
-            }}
-          >
-            <Slider
-              value={volume * 100}
-              onChange={handleVolumeChange}
-              aria-label="Volume"
-              size="small"
-              sx={{
-                color: theme.palette.primary.main,
-                width: 80,
-                ml: 2,
-                height: 4,
-                '& .MuiSlider-thumb': {
-                  width: 8,
-                  height: 8,
-                  transition: '0.3s cubic-bezier(.47,1.64,.41,.8)',
-                  '&:before': {
-                    boxShadow: '0 2px 12px 0 rgba(0,0,0,0.4)',
-                  },
-                  '&:hover, &.Mui-focusVisible': {
-                    boxShadow: `0px 0px 0px 8px ${theme.palette.primary.main}33`
-                  },
-                  '&.Mui-active': {
-                    width: 12,
-                    height: 12
-                  }
-                },
-                '& .MuiSlider-rail': {
-                  opacity: 0.28
-                }
-              }}
-            />
-          </Box>
-        </Stack>
+
+        {/* Spacer to balance layout */}
+        <Box sx={{ minWidth: 40 }} />
       </Stack>
 
       {/* Track List */}
@@ -397,60 +420,81 @@ function MusicPlayer({ tracks = [], artistName }) {
               transition: 'background-color 0.2s ease'
             }}
           >
-            <Box
+            {/* Track Number */}
+            <Typography
+              variant="body2"
               sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 0.5,
-                backgroundColor: currentTrackIndex === index ? 
-                  theme.palette.primary.main + '33' : 
-                  theme.palette.action.selected,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                position: 'relative',
-                overflow: 'hidden',
-                '&::after': currentTrackIndex === index && isPlaying ? {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: `linear-gradient(45deg, ${theme.palette.primary.main}33, transparent)`,
-                  animation: 'pulse 2s ease-in-out infinite'
-                } : {},
-                '@keyframes pulse': {
-                  '0%': {
-                    opacity: 0.5,
-                    transform: 'scale(1)'
-                  },
-                  '50%': {
-                    opacity: 1,
-                    transform: 'scale(1.1)'
-                  },
-                  '100%': {
-                    opacity: 0.5,
-                    transform: 'scale(1)'
-                  }
-                }
+                width: 24,
+                textAlign: 'center',
+                color: currentTrackIndex === index ? 
+                  theme.palette.primary.main : 
+                  theme.palette.text.secondary,
+                fontWeight: currentTrackIndex === index ? 600 : 400
               }}
             >
-              <NoteIcon 
-                sx={{ 
-                  fontSize: 16, 
-                  color: currentTrackIndex === index ? 
-                    theme.palette.primary.main : 
-                    theme.palette.text.secondary,
-                  transform: currentTrackIndex === index && isPlaying ? 'translateY(0)' : 'translateY(0)',
-                  transition: 'transform 0.3s ease'
+              {index + 1}
+            </Typography>
+
+            {/* Playing Indicator */}
+            {currentTrackIndex === index && isPlaying && (
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-              />
-            </Box>
+              >
+                <Box
+                  sx={{
+                    width: 3,
+                    height: 12,
+                    backgroundColor: theme.palette.primary.main,
+                    borderRadius: 1,
+                    animation: 'equalizer1 0.8s ease infinite',
+                    '@keyframes equalizer1': {
+                      '0%, 100%': { height: 4 },
+                      '50%': { height: 12 }
+                    }
+                  }}
+                />
+                <Box
+                  sx={{
+                    width: 3,
+                    height: 8,
+                    backgroundColor: theme.palette.primary.main,
+                    borderRadius: 1,
+                    mx: 0.5,
+                    animation: 'equalizer2 0.8s ease infinite',
+                    '@keyframes equalizer2': {
+                      '0%, 100%': { height: 8 },
+                      '50%': { height: 4 }
+                    }
+                  }}
+                />
+                <Box
+                  sx={{
+                    width: 3,
+                    height: 6,
+                    backgroundColor: theme.palette.primary.main,
+                    borderRadius: 1,
+                    animation: 'equalizer3 0.8s ease infinite',
+                    '@keyframes equalizer3': {
+                      '0%, 100%': { height: 6 },
+                      '50%': { height: 10 }
+                    }
+                  }}
+                />
+              </Box>
+            )}
+
+            {/* Track Title */}
             <Typography 
               variant="body2"
               sx={{ 
+                flex: 1,
                 color: currentTrackIndex === index ? 
                   theme.palette.primary.main : 
                   theme.palette.text.primary,
@@ -458,6 +502,18 @@ function MusicPlayer({ tracks = [], artistName }) {
               }}
             >
               {track.title || `Track ${index + 1}`}
+            </Typography>
+
+            {/* Track Duration */}
+            <Typography
+              variant="caption"
+              sx={{
+                color: theme.palette.text.secondary,
+                minWidth: 40,
+                textAlign: 'right'
+              }}
+            >
+              {formatTime(duration)}
             </Typography>
           </Box>
         ))}

@@ -13,9 +13,16 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material'
-import { Add as AddIcon, Delete as DeleteIcon, Upload as UploadIcon, QrCode as QrCodeIcon } from '@mui/icons-material'
+import { 
+  QrCode as QrCodeIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Upload as UploadIcon,
+} from '@mui/icons-material'
 import { createArtist, getArtist, updateArtist, getUploadUrl, generateQrCode } from '../../services/artistService'
 import Header from '../../components/Header'
+import ImageGallery from '../../components/ImageGallery'
+import AudioGallery from '../../components/AudioGallery'
 
 function ArtistForm() {
   const { artistId } = useParams()
@@ -24,6 +31,7 @@ function ArtistForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [qrLoading, setQrLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({})
   const [formData, setFormData] = useState({
     artistId: '',
     artistName: '',
@@ -50,6 +58,21 @@ function ArtistForm() {
     }
   }, [artistId])
 
+  // Generate artist ID from name
+  useEffect(() => {
+    if (!artistId && formData.artistName) {
+      const baseId = formData.artistName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+      
+      setFormData(prev => ({
+        ...prev,
+        artistId: baseId
+      }))
+    }
+  }, [formData.artistName, artistId])
+
   const loadArtist = async () => {
     try {
       setLoading(true)
@@ -72,21 +95,12 @@ function ArtistForm() {
         throw new Error('You must be logged in to create an artist')
       }
 
-      // Validate artistId format - now allowing hyphens
-      const artistIdPattern = /^[a-z0-9-]+$/
-      if (!artistId && !artistIdPattern.test(formData.artistId)) {
-        throw new Error('Artist ID can only contain lowercase letters, numbers, and hyphens')
-      }
-
-      // Ensure required fields are present
       if (!formData.artistName.trim()) {
         throw new Error('Artist Name is required')
       }
 
-      // Clean up the form data
       const cleanFormData = {
         ...formData,
-        artistId: formData.artistId.toLowerCase(),
         quickFacts: {
           fact1: formData.quickFacts?.fact1 || '',
           fact2: formData.quickFacts?.fact2 || '',
@@ -104,7 +118,6 @@ function ArtistForm() {
         await createArtist(cleanFormData)
       }
 
-      // Navigate to artist list after successful save
       navigate('/artist-list')
     } catch (err) {
       console.error('Form submission error:', err)
@@ -116,19 +129,10 @@ function ArtistForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    // For artistId: allow lowercase letters, numbers, and hyphens
-    if (name === 'artistId') {
-      const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-      setFormData(prev => ({
-        ...prev,
-        [name]: sanitizedValue
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }))
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
   const handleQuickFactChange = (factKey, value) => {
@@ -141,26 +145,10 @@ function ArtistForm() {
     }))
   }
 
-  const handleGalleryChange = (index, value) => {
-    const newGallery = [...formData.gallery]
-    newGallery[index] = value
+  const handleImagesChange = (newImages) => {
     setFormData(prev => ({
       ...prev,
-      gallery: newGallery
-    }))
-  }
-
-  const addGalleryImage = () => {
-    setFormData(prev => ({
-      ...prev,
-      gallery: [...prev.gallery, '']
-    }))
-  }
-
-  const removeGalleryImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      gallery: prev.gallery.filter((_, i) => i !== index)
+      gallery: newImages
     }))
   }
 
@@ -176,121 +164,97 @@ function ArtistForm() {
     }))
   }
 
-  const addAudioFile = () => {
-    setFormData(prev => ({
-      ...prev,
-      audioFiles: [...prev.audioFiles, { title: '', url: '', id: `song${prev.audioFiles.length + 1}` }]
-    }))
-  }
-
-  const removeAudioFile = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      audioFiles: prev.audioFiles.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleFileUpload = async (file, type, index = null) => {
+  const handleFileUpload = async (files, type = 'images') => {
     try {
-      setLoading(true);
-      console.log('Starting upload process for:', { file, type, artistId });
-      
-      // Get original file extension and create clean file name
-      const originalFileName = file.name;
-      const fileExtension = originalFileName.split('.').pop().toLowerCase();
-      const cleanFileName = originalFileName
-        .toLowerCase()
-        .replace(/[^a-z0-9.]/g, '-');
+      for (const file of files) {
+        const fileId = `${Date.now()}-${file.name}`
+        setUploadProgress(prev => ({ ...prev, [fileId]: 0 }))
+
+        // Get file extension
+        const fileExt = file.name.split('.').pop().toLowerCase()
         
-      // Create the full path
-      const fileName = `${type}/${cleanFileName}`;
-      
-      console.log('Requesting upload URL for:', fileName);
+        // Create unique filename with timestamp
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(2, 8)
+        const cleanBaseName = file.name
+          .toLowerCase()
+          .split('.')
+          .slice(0, -1)
+          .join('.')
+          .replace(/[^a-z0-9]/g, '-')
+        
+        const uniqueFileName = `${cleanBaseName}-${timestamp}-${randomStr}.${fileExt}`
+        const fileName = `${type}/${uniqueFileName}`
+        
+        const { uploadUrl, fileUrl } = await getUploadUrl(artistId || formData.artistId, fileName, file.type)
 
-      const { uploadUrl, fileUrl } = await getUploadUrl(artistId, fileName, file.type);
-      console.log('Received upload URL:', { uploadUrl, fileUrl });
-      console.log('Attempting to upload to S3...');
+        const xhr = new XMLHttpRequest()
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100
+            setUploadProgress(prev => ({ ...prev, [fileId]: percentComplete }))
+          }
+        })
 
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        mode: 'cors'
-      });
+        await new Promise((resolve, reject) => {
+          xhr.open('PUT', uploadUrl)
+          xhr.onload = () => resolve()
+          xhr.onerror = () => reject()
+          xhr.send(file)
+        })
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed with status: ${uploadResponse.status}`);
-      }
-
-      console.log('File uploaded successfully to:', fileUrl);
-
-      // Update the artist record with the new file URL
-      let newData;
-      if (type === 'images') {
-        if (index === null) {
-          // Hero shot
-          newData = await new Promise(resolve => {
-            setFormData(prev => {
-              const newState = {
-                ...prev,
-                heroShot: fileUrl
-              };
-              resolve(newState);
-              return newState;
-            });
-          });
-        } else {
-          // Gallery image
-          newData = await new Promise(resolve => {
-            setFormData(prev => {
-              const gallery = Array.isArray(prev.gallery) ? [...prev.gallery] : [];
-              const newGallery = [...gallery];
-              newGallery[index] = fileUrl;
-              
-              console.log('Updating gallery with:', newGallery);
-              
-              const newState = {
-                ...prev,
-                gallery: newGallery
-              };
-              resolve(newState);
-              return newState;
-            });
-          });
-        }
-      } else if (type === 'music') {
-        newData = await new Promise(resolve => {
+        if (type === 'images') {
+          setFormData(prev => ({
+            ...prev,
+            gallery: [...prev.gallery, fileUrl]
+          }))
+        } else if (type === 'audio') {
+          // Find the processing placeholder and update it
           setFormData(prev => {
-            const newAudioFiles = Array.isArray(prev.audioFiles) ? [...prev.audioFiles] : [];
-            if (!newAudioFiles[index]) {
-              newAudioFiles[index] = { title: originalFileName.replace(`.${fileExtension}`, ''), id: `song${index + 1}` };
+            const newAudioFiles = [...prev.audioFiles]
+            const processingIndex = newAudioFiles.findIndex(
+              af => af.processing && af.originalFile === file
+            )
+            
+            if (processingIndex !== -1) {
+              newAudioFiles[processingIndex] = {
+                ...newAudioFiles[processingIndex],
+                url: fileUrl,
+                processing: false,
+                originalFile: undefined
+              }
             }
-            newAudioFiles[index] = {
-              ...newAudioFiles[index],
-              url: fileUrl
-            };
-            const newState = {
+            
+            return {
               ...prev,
               audioFiles: newAudioFiles
-            };
-            resolve(newState);
-            return newState;
-          });
-        });
-      }
+            }
+          })
+        }
 
-      // Only update the database once with the new data
-      if (newData) {
-        const { artistId: _, ...updates } = newData;
-        console.log('Saving updates to database:', updates);
-        await updateArtist(artistId, updates);
+        setUploadProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[fileId]
+          return newProgress
+        })
       }
     } catch (error) {
-      console.error('Upload error details:', error);
-      setError(`Upload failed: ${error.message}`);
-    } finally {
-      setLoading(false);
+      console.error('Upload failed:', error)
+      setError(`Failed to upload files: ${error.message}`)
+      
+      // Remove any processing items that failed
+      if (type === 'audio') {
+        setFormData(prev => ({
+          ...prev,
+          audioFiles: prev.audioFiles.filter(af => !af.processing)
+        }))
+      }
     }
-  };
+  }
+
+  const handleAudioUpload = (files) => {
+    handleFileUpload(files, 'audio')
+  }
 
   const handleGenerateQrCode = async () => {
     if (!artistId) return
@@ -299,7 +263,6 @@ function ArtistForm() {
       setQrLoading(true)
       setError('')
       await generateQrCode(artistId)
-      // Show success message
       alert('QR Code generated successfully!')
     } catch (err) {
       console.error('QR generation error:', err)
@@ -309,17 +272,10 @@ function ArtistForm() {
     }
   }
 
-  const handleCancel = () => {
-    navigate('/artist-list');
-  };
-
   if (loading) {
     return (
       <>
-        <Header 
-          title={artistId ? 'Edit Artist' : 'Create Artist'} 
-          showAddButton={false}
-        />
+        <Header />
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'center', 
@@ -334,11 +290,8 @@ function ArtistForm() {
 
   return (
     <>
-      <Header 
-        title={artistId ? 'Edit Artist' : 'Create Artist'} 
-        showAddButton={false}
-      />
-      <Paper sx={{ p: 3 }}>
+      <Header />
+      <Paper sx={{ p: 3, m: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
         <form onSubmit={handleSubmit}>
@@ -349,9 +302,8 @@ function ArtistForm() {
                 label="Artist ID"
                 name="artistId"
                 value={formData.artistId}
-                onChange={handleChange}
-                disabled={!!artistId}
-                required
+                disabled
+                helperText="Automatically generated from artist name"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -418,34 +370,6 @@ function ArtistForm() {
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  label="Hero Shot URL"
-                  name="heroShot"
-                  value={formData.heroShot}
-                  onChange={handleChange}
-                  disabled={loading}
-                />
-                <input
-                  accept="image/*"
-                  type="file"
-                  id="hero-shot-upload"
-                  hidden
-                  onChange={(e) => handleFileUpload(e.target.files[0], 'images')}
-                />
-                <label htmlFor="hero-shot-upload">
-                  <IconButton 
-                    component="span" 
-                    disabled={loading || !artistId}
-                    color="primary"
-                  >
-                    <UploadIcon />
-                  </IconButton>
-                </label>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Instagram"
@@ -492,96 +416,31 @@ function ArtistForm() {
 
             {/* Gallery Section */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Gallery Images</Typography>
-                <IconButton onClick={addGalleryImage} color="primary">
-                  <AddIcon />
-                </IconButton>
-              </Box>
-              {formData.gallery.map((url, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                  <TextField
-                    fullWidth
-                    label={`Image URL ${index + 1}`}
-                    value={url}
-                    onChange={(e) => handleGalleryChange(index, e.target.value)}
-                    disabled={loading}
-                  />
-                  <input
-                    accept="image/*"
-                    type="file"
-                    id={`gallery-upload-${index}`}
-                    hidden
-                    onChange={(e) => handleFileUpload(e.target.files[0], 'images', index)}
-                  />
-                  <label htmlFor={`gallery-upload-${index}`}>
-                    <IconButton 
-                      component="span" 
-                      disabled={loading || !artistId}
-                      color="primary"
-                    >
-                      <UploadIcon />
-                    </IconButton>
-                  </label>
-                  <IconButton onClick={() => removeGalleryImage(index)} color="error">
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              ))}
+              <Typography variant="h6" gutterBottom>Gallery Images</Typography>
+              <ImageGallery
+                images={formData.gallery}
+                onImagesChange={handleImagesChange}
+                onUpload={handleFileUpload}
+                uploadProgress={uploadProgress}
+              />
             </Grid>
 
             {/* Audio Files Section */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Audio Files</Typography>
-                <IconButton onClick={addAudioFile} color="primary">
-                  <AddIcon />
-                </IconButton>
-              </Box>
-              {formData.audioFiles.map((file, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                  <TextField
-                    label="Title"
-                    value={file.title}
-                    onChange={(e) => handleAudioFileChange(index, 'title', e.target.value)}
-                    sx={{ flex: 1 }}
-                    disabled={loading}
-                  />
-                  <TextField
-                    label="URL"
-                    value={file.url}
-                    onChange={(e) => handleAudioFileChange(index, 'url', e.target.value)}
-                    sx={{ flex: 2 }}
-                    disabled={loading}
-                  />
-                  <input
-                    accept="audio/*"
-                    type="file"
-                    id={`audio-upload-${index}`}
-                    hidden
-                    onChange={(e) => handleFileUpload(e.target.files[0], 'music', index)}
-                  />
-                  <label htmlFor={`audio-upload-${index}`}>
-                    <IconButton 
-                      component="span" 
-                      disabled={loading || !artistId}
-                      color="primary"
-                    >
-                      <UploadIcon />
-                    </IconButton>
-                  </label>
-                  <IconButton onClick={() => removeAudioFile(index)} color="error">
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              ))}
+              <Typography variant="h6" gutterBottom>Audio Files</Typography>
+              <AudioGallery
+                audioFiles={formData.audioFiles}
+                onAudioFilesChange={(newFiles) => setFormData(prev => ({ ...prev, audioFiles: newFiles }))}
+                onUpload={handleAudioUpload}
+                uploadProgress={uploadProgress}
+              />
             </Grid>
 
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                 <Button 
                   variant="outlined" 
-                  onClick={handleCancel}
+                  onClick={() => navigate('/artist-list')}
                 >
                   Cancel
                 </Button>
@@ -589,8 +448,9 @@ function ArtistForm() {
                   type="submit" 
                   variant="contained" 
                   disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} /> : null}
                 >
-                  {artistId ? 'Update' : 'Create'}
+                  {artistId ? 'Update' : 'Create'} Artist
                 </Button>
               </Box>
             </Grid>
