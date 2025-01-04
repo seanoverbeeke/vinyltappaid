@@ -14,8 +14,8 @@ import {
   Tooltip,
 } from '@mui/material'
 import { Add as AddIcon, Delete as DeleteIcon, Upload as UploadIcon, QrCode as QrCodeIcon } from '@mui/icons-material'
-import { createArtist, getArtist, updateArtist, getUploadUrl, generateQrCode } from '../services/artistService'
-import Header from '../components/Header'
+import { createArtist, getArtist, updateArtist, getUploadUrl, generateQrCode } from '../../services/artistService'
+import Header from '../../components/Header'
 
 function ArtistForm() {
   const { artistId } = useParams()
@@ -309,6 +309,10 @@ function ArtistForm() {
     }
   }
 
+  const handleCancel = () => {
+    navigate('/artist-list');
+  };
+
   if (loading) {
     return (
       <>
@@ -577,7 +581,7 @@ function ArtistForm() {
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                 <Button 
                   variant="outlined" 
-                  onClick={() => navigate('/')}
+                  onClick={handleCancel}
                 >
                   Cancel
                 </Button>

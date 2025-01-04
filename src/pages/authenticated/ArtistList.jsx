@@ -25,8 +25,8 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon,
 } from '@mui/icons-material'
-import { getAllArtists, deleteArtist } from '../services/artistService'
-import Header from '../components/Header'
+import { getAllArtists, deleteArtist } from "../../services/artistService"
+import Header from "../../components/Header"
 import { useAuthenticator } from '@aws-amplify/ui-react'
 
 console.log('ArtistList.jsx is loading')
@@ -84,7 +84,7 @@ function ArtistList() {
 
   const handleView = (artistId) => {
     console.log('Navigating to profile:', artistId)
-    navigate(`/artist/${artistId}`)
+    navigate(`/artist-profile/${artistId}`)
   }
 
   const handleDeleteClick = (artist) => {
