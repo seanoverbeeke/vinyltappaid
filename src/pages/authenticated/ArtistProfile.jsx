@@ -21,12 +21,12 @@ import {
   Language as WebIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material'
-import { getArtist } from '../services/artistService'
-import Header from '../components/Header'
-import MusicPlayer from '../components/MusicPlayer'
+import { getArtist } from "../../services/artistService"
+import Header from "../../components/Header"
+import MusicPlayer from "../../components/MusicPlayer"
 
 function ArtistProfile() {
-  const { id } = useParams()
+  const { artistId } = useParams()
   const navigate = useNavigate()
   const theme = useTheme()
   const [artist, setArtist] = useState(null)
@@ -34,23 +34,23 @@ function ArtistProfile() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const loadArtist = async () => {
-      try {
-        setLoading(true)
-        const data = await getArtist(id)
-        setArtist(data)
-      } catch (err) {
-        setError('Failed to load artist profile')
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (id) {
+    if (artistId) {
       loadArtist()
     }
-  }, [id])
+  }, [artistId])
+
+  const loadArtist = async () => {
+    try {
+      setLoading(true)
+      const data = await getArtist(artistId)
+      setArtist(data)
+    } catch (err) {
+      setError('Failed to load artist profile')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
