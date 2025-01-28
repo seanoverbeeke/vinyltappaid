@@ -198,19 +198,19 @@ function ArtistProfile() {
             <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
               <Typography variant="h6" gutterBottom>QR Code</Typography>
               {artist.artistId && (
-                <Box 
-                  component="img"
+                  <Box 
+                    component="img"
                   src={`https://vinyltapbucket001.s3.amazonaws.com/${artist.artistId.replace('-', '').toLowerCase()}/qrcode/qr-code.png`}
-                  alt="Artist QR Code"
-                  sx={{ 
-                    width: '100%',
-                    height: 'auto',
-                    maxWidth: 200,
-                    display: 'block',
-                    margin: '0 auto',
+                    alt="Artist QR Code"
+                    sx={{ 
+                      width: '100%',
+                      height: 'auto',
+                      maxWidth: 200,
+                      display: 'block',
+                      margin: '0 auto',
                     borderRadius: 1
-                  }}
-                />
+                    }}
+                  />
               )}
             </Paper>
 
