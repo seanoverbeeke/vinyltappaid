@@ -77,10 +77,10 @@ export const createArtist = async (artistData) => {
       headers,
       body: JSON.stringify(artistData)
     });
-    
+
     const responseText = await response.text();
     console.log('Create artist response:', responseText);
-    
+
     if (!response.ok) {
       throw new Error(responseText || 'Failed to create artist');
     }

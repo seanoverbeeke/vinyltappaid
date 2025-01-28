@@ -10,19 +10,43 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  IconButton,
-  Tooltip,
+  Card,
+  CardContent,
+  Stack,
+  FormControlLabel,
+  Switch,
+  Tabs,
+  Tab,
 } from '@mui/material'
 import { 
-  QrCode as QrCodeIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  Upload as UploadIcon,
+  Edit as EditIcon,
+  Person as PersonIcon,
+  Event as EventIcon,
+  Share as ShareIcon,
 } from '@mui/icons-material'
-import { createArtist, getArtist, updateArtist, getUploadUrl, generateQrCode } from '../../services/artistService'
+import { createArtist, getArtist, updateArtist } from '../../services/artistService'
 import Header from '../../components/Header'
-import ImageGallery from '../../components/ImageGallery'
-import AudioGallery from '../../components/AudioGallery'
+
+// Tab Panel Component
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`artist-tabpanel-${index}`}
+      aria-labelledby={`artist-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  )
+}
 
 function ArtistForm() {
   const { artistId } = useParams()
@@ -30,26 +54,31 @@ function ArtistForm() {
   const { user } = useAuthenticator()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [qrLoading, setQrLoading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({})
+  const [editingTourDate, setEditingTourDate] = useState(null)
+  const [activeTab, setActiveTab] = useState(0)
   const [formData, setFormData] = useState({
     artistId: '',
     artistName: '',
     bio: '',
-    currentSong: '',
     email: '',
     genre: '',
     heroShot: '',
     instagram: '',
     tiktok: '',
     label: '',
+    socialShare: '',
+    artistWebsite: '',
     quickFacts: {
       fact1: '',
       fact2: '',
       fact3: '',
     },
     gallery: [],
-    audioFiles: []
+    audioFiles: [],
+    tourDates: [],
+    spotifyArtistId: '',
+    currentSong: '',
+    userId: ''
   })
 
   useEffect(() => {
@@ -58,26 +87,17 @@ function ArtistForm() {
     }
   }, [artistId])
 
-  // Generate artist ID from name
-  useEffect(() => {
-    if (!artistId && formData.artistName) {
-      const baseId = formData.artistName
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, '-')
-      
-      setFormData(prev => ({
-        ...prev,
-        artistId: baseId
-      }))
-    }
-  }, [formData.artistName, artistId])
-
   const loadArtist = async () => {
     try {
       setLoading(true)
       const data = await getArtist(artistId)
-      setFormData(data)
+      setFormData({
+        ...data,
+        tourDates: data.tourDates || [],
+        quickFacts: data.quickFacts || { fact1: '', fact2: '', fact3: '' },
+        gallery: data.gallery || [],
+        audioFiles: data.audioFiles || []
+      })
     } catch (err) {
       setError('Failed to load artist data')
     } finally {
@@ -92,33 +112,16 @@ function ArtistForm() {
 
     try {
       if (!user?.signInDetails?.loginId) {
-        throw new Error('You must be logged in to create an artist')
-      }
-
-      if (!formData.artistName.trim()) {
-        throw new Error('Artist Name is required')
-      }
-
-      const cleanFormData = {
-        ...formData,
-        quickFacts: {
-          fact1: formData.quickFacts?.fact1 || '',
-          fact2: formData.quickFacts?.fact2 || '',
-          fact3: formData.quickFacts?.fact3 || '',
-        },
-        gallery: formData.gallery || [],
-        audioFiles: formData.audioFiles || [],
-        userId: user.signInDetails.loginId
+        throw new Error('You must be logged in to update an artist')
       }
 
       if (artistId) {
-        const { artistId: _, ...updates } = cleanFormData
-        await updateArtist(artistId, updates)
-      } else {
-        await createArtist(cleanFormData)
+        await updateArtist(artistId, {
+          spotifyArtistId: formData.spotifyArtistId,
+          tourDates: formData.tourDates
+        })
+        navigate('/artist-list')
       }
-
-      navigate('/artist-list')
     } catch (err) {
       console.error('Form submission error:', err)
       setError(err.message || 'Failed to save artist')
@@ -135,141 +138,45 @@ function ArtistForm() {
     }))
   }
 
-  const handleQuickFactChange = (factKey, value) => {
+  const addTourDate = () => {
+    const newIndex = formData.tourDates.length
     setFormData(prev => ({
       ...prev,
-      quickFacts: {
-        ...prev.quickFacts,
-        [factKey]: value
-      }
+      tourDates: [...prev.tourDates, {
+        date: '',
+        time: '',
+        venue: '',
+        location: '',
+        isPublic: true
+      }]
+    }))
+    setEditingTourDate(newIndex)
+  }
+
+  const removeTourDate = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      tourDates: prev.tourDates.filter((_, i) => i !== index)
     }))
   }
 
-  const handleImagesChange = (newImages) => {
-    setFormData(prev => ({
-      ...prev,
-      gallery: newImages
-    }))
+  const formatTime = (time) => {
+    if (!time) return ''
+    return time
   }
 
-  const handleAudioFileChange = (index, field, value) => {
-    const newAudioFiles = [...formData.audioFiles]
-    newAudioFiles[index] = {
-      ...newAudioFiles[index],
-      [field]: value
-    }
-    setFormData(prev => ({
-      ...prev,
-      audioFiles: newAudioFiles
-    }))
-  }
-
-  const handleFileUpload = async (files, type = 'images') => {
-    try {
-      for (const file of files) {
-        const fileId = `${Date.now()}-${file.name}`
-        setUploadProgress(prev => ({ ...prev, [fileId]: 0 }))
-
-        // Get file extension
-        const fileExt = file.name.split('.').pop().toLowerCase()
-        
-        // Create unique filename with timestamp
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(2, 8)
-        const cleanBaseName = file.name
-          .toLowerCase()
-          .split('.')
-          .slice(0, -1)
-          .join('.')
-          .replace(/[^a-z0-9]/g, '-')
-        
-        const uniqueFileName = `${cleanBaseName}-${timestamp}-${randomStr}.${fileExt}`
-        const fileName = `${type}/${uniqueFileName}`
-        
-        const { uploadUrl, fileUrl } = await getUploadUrl(artistId || formData.artistId, fileName, file.type)
-
-        const xhr = new XMLHttpRequest()
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100
-            setUploadProgress(prev => ({ ...prev, [fileId]: percentComplete }))
-          }
-        })
-
-        await new Promise((resolve, reject) => {
-          xhr.open('PUT', uploadUrl)
-          xhr.onload = () => resolve()
-          xhr.onerror = () => reject()
-          xhr.send(file)
-        })
-
-        if (type === 'images') {
-          setFormData(prev => ({
-            ...prev,
-            gallery: [...prev.gallery, fileUrl]
-          }))
-        } else if (type === 'audio') {
-          // Find the processing placeholder and update it
-          setFormData(prev => {
-            const newAudioFiles = [...prev.audioFiles]
-            const processingIndex = newAudioFiles.findIndex(
-              af => af.processing && af.originalFile === file
-            )
-            
-            if (processingIndex !== -1) {
-              newAudioFiles[processingIndex] = {
-                ...newAudioFiles[processingIndex],
-                url: fileUrl,
-                processing: false,
-                originalFile: undefined
-              }
-            }
-            
-            return {
-              ...prev,
-              audioFiles: newAudioFiles
-            }
-          })
-        }
-
-        setUploadProgress(prev => {
-          const newProgress = { ...prev }
-          delete newProgress[fileId]
-          return newProgress
-        })
+  const handleTourDateChange = (index, field, value) => {
+    setFormData(prev => {
+      const newTourDates = [...prev.tourDates]
+      newTourDates[index] = {
+        ...newTourDates[index],
+        [field]: value
       }
-    } catch (error) {
-      console.error('Upload failed:', error)
-      setError(`Failed to upload files: ${error.message}`)
-      
-      // Remove any processing items that failed
-      if (type === 'audio') {
-        setFormData(prev => ({
-          ...prev,
-          audioFiles: prev.audioFiles.filter(af => !af.processing)
-        }))
+      return {
+        ...prev,
+        tourDates: newTourDates
       }
-    }
-  }
-
-  const handleAudioUpload = (files) => {
-    handleFileUpload(files, 'audio')
-  }
-
-  const handleGenerateQrCode = async () => {
-    if (!artistId) return
-    
-    try {
-      setQrLoading(true)
-      setError('')
-      await generateQrCode(artistId)
-      alert('QR Code generated successfully!')
-    } catch (err) {
-      console.error('QR generation error:', err)
-      setError('Failed to generate QR code: ' + err.message)
-    } finally {
-      setQrLoading(false)
-    }
+    })
   }
 
   if (loading) {
@@ -291,156 +198,423 @@ function ArtistForm() {
   return (
     <>
       <Header />
-      <Paper sx={{ p: 3, m: 2 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        
-        <form onSubmit={handleSubmit}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Artist ID"
-                name="artistId"
-                value={formData.artistId}
-                disabled
-                helperText="Automatically generated from artist name"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  label="Artist Name"
-                  name="artistName"
-                  value={formData.artistName}
-                  onChange={handleChange}
-                  required
-                />
-                {artistId && (
-                  <Tooltip title="Generate QR Code">
-                    <IconButton 
-                      onClick={handleGenerateQrCode}
-                      disabled={qrLoading}
-                      color="primary"
-                      sx={{ flexShrink: 0 }}
-                    >
-                      {qrLoading ? <CircularProgress size={24} /> : <QrCodeIcon />}
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                multiline
-                rows={4}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Current Song"
-                name="currentSong"
-                value={formData.currentSong}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Genre"
-                name="genre"
-                value={formData.genre}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Instagram"
-                name="instagram"
-                value={formData.instagram}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="TikTok"
-                name="tiktok"
-                value={formData.tiktok}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Label"
-                name="label"
-                value={formData.label}
-                onChange={handleChange}
-              />
-            </Grid>
+        <Paper sx={{ mb: 3 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              <Tab icon={<PersonIcon />} label="Basic Info" />
+              <Tab icon={<EventIcon />} label="Tour Dates" />
+              <Tab icon={<ShareIcon />} label="Social & Facts" />
+            </Tabs>
+          </Box>
 
-            {/* Quick Facts Section */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>Quick Facts</Typography>
-              <Grid container spacing={2}>
-                {['fact1', 'fact2', 'fact3'].map((factKey) => (
-                  <Grid item xs={12} key={factKey}>
-                    <TextField
-                      fullWidth
-                      label={`Fact ${factKey.slice(-1)}`}
-                      value={formData.quickFacts[factKey] || ''}
-                      onChange={(e) => handleQuickFactChange(factKey, e.target.value)}
-                    />
-                  </Grid>
-                ))}
+          <form onSubmit={handleSubmit}>
+            {error && <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>}
+
+            {/* Basic Info Tab */}
+            <TabPanel value={activeTab} index={0}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Artist Details</Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Artist ID"
+                            name="artistId"
+                            value={formData.artistId}
+                            onChange={handleChange}
+                            disabled={!!artistId}
+                            required
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Artist Name"
+                            name="artistName"
+                            value={formData.artistName}
+                            onChange={handleChange}
+                            required
+                          />
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Additional Info</Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Genre"
+                            name="genre"
+                            value={formData.genre}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Label"
+                            name="label"
+                            value={formData.label}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Email"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Biography</Typography>
+                      <TextField
+                        fullWidth
+                        label="Bio"
+                        name="bio"
+                        value={formData.bio}
+                        onChange={handleChange}
+                        multiline
+                        rows={4}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
               </Grid>
-            </Grid>
+            </TabPanel>
 
-            {/* Gallery Section */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>Gallery Images</Typography>
-              <ImageGallery
-                images={formData.gallery}
-                onImagesChange={handleImagesChange}
-                onUpload={handleFileUpload}
-                uploadProgress={uploadProgress}
-              />
-            </Grid>
+            {/* Tour Dates Tab */}
+            <TabPanel value={activeTab} index={1}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h6">Tour Dates</Typography>
+                    <Box sx={{ flexGrow: 1 }} />
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={addTourDate}
+                    >
+                      Add Tour Date
+                    </Button>
+                  </Box>
 
-            {/* Audio Files Section */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>Audio Files</Typography>
-              <AudioGallery
-                audioFiles={formData.audioFiles}
-                onAudioFilesChange={(newFiles) => setFormData(prev => ({ ...prev, audioFiles: newFiles }))}
-                onUpload={handleAudioUpload}
-                uploadProgress={uploadProgress}
-              />
-            </Grid>
+                  <Stack spacing={2}>
+                    {formData.tourDates.map((date, index) => (
+                      <Paper 
+                        key={index} 
+                        elevation={2} 
+                        sx={{ 
+                          p: 2,
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            boxShadow: 4
+                          }
+                        }}
+                      >
+                        {editingTourDate === index ? (
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Date"
+                                value={date.date}
+                                onChange={(e) => handleTourDateChange(index, 'date', e.target.value)}
+                                helperText="Format: MMM D, YYYY (e.g., Jan 30, 2025)"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Time"
+                                value={date.time}
+                                onChange={(e) => handleTourDateChange(index, 'time', e.target.value)}
+                                helperText="Format: HH:mm (e.g., 19:30)"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Venue"
+                                value={date.venue}
+                                onChange={(e) => handleTourDateChange(index, 'venue', e.target.value)}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Location"
+                                value={date.location}
+                                onChange={(e) => handleTourDateChange(index, 'location', e.target.value)}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <FormControlLabel
+                                control={
+                                  <Switch
+                                    checked={date.isPublic}
+                                    onChange={(e) => handleTourDateChange(index, 'isPublic', e.target.checked)}
+                                  />
+                                }
+                                label={date.isPublic ? "Public Event" : "Private Event"}
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                <Button
+                                  variant="outlined"
+                                  color="error"
+                                  startIcon={<DeleteIcon />}
+                                  onClick={() => {
+                                    removeTourDate(index)
+                                    setEditingTourDate(null)
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                onClick={() => setEditingTourDate(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="contained"
+                                onClick={() => setEditingTourDate(null)}
+                                >
+                                Save
+                                </Button>
+                              </Box>
+                            </Grid>
+                          </Grid>
+                        ) : (
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                              <Paper 
+                                elevation={1}
+                                sx={{ 
+                                  p: 1.5,
+                                  textAlign: 'center',
+                                  minWidth: 100,
+                                  bgcolor: 'primary.main',
+                                  color: 'primary.contrastText'
+                                }}
+                              >
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                  {date.date.split(',')[0]}
+                                </Typography>
+                                <Typography variant="subtitle2">
+                                  {date.date.split(',')[1] || ''}
+                                </Typography>
+                              </Paper>
 
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                              <Box sx={{ flexGrow: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Typography variant="h6" sx={{ flexGrow: 1 }}>
+                                    {date.venue}
+                                  </Typography>
+                                  <Button
+                                    startIcon={<EditIcon />}
+                                    onClick={() => setEditingTourDate(index)}
+                                    variant="outlined"
+                                    size="small"
+                                  >
+                                    Edit
+                                  </Button>
+                                </Box>
+                                <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                                  {date.location} • {formatTime(date.time)}
+                                </Typography>
+                                {!date.isPublic && (
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      display: 'inline-block',
+                                      bgcolor: 'action.selected',
+                                      px: 1,
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      mt: 1
+                                    }}
+                                  >
+                                    Private Event
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                          </Box>
+                        )}
+                      </Paper>
+                    ))}
+
+                    {formData.tourDates.length === 0 && (
+                      <Box 
+                        sx={{ 
+                          textAlign: 'center',
+                          py: 4,
+                          bgcolor: 'action.hover',
+                          borderRadius: 1
+                        }}
+                      >
+                        <Typography color="text.secondary" gutterBottom>
+                          No tour dates added yet
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddIcon />}
+                          onClick={addTourDate}
+                          sx={{ mt: 1 }}
+                        >
+                          Add Your First Tour Date
+                        </Button>
+                      </Box>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </TabPanel>
+
+            {/* Social & Facts Tab */}
+            <TabPanel value={activeTab} index={2}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Social Media</Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Instagram"
+                            name="instagram"
+                            value={formData.instagram}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="TikTok"
+                            name="tiktok"
+                            value={formData.tiktok}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Website"
+                            name="artistWebsite"
+                            value={formData.artistWebsite}
+                            onChange={handleChange}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Spotify Artist ID"
+                            name="spotifyArtistId"
+                            value={formData.spotifyArtistId}
+                            onChange={handleChange}
+                            helperText="Enter the Spotify artist ID (e.g., 7fh69dHXXlOOJEca9Asw7f)"
+                          />
+                        </Grid>
+                        {formData.spotifyArtistId && (
+                          <Grid item xs={12}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Spotify Preview
+                            </Typography>
+                            <Box
+                              sx={{
+                                position: 'relative',
+                                paddingTop: '380px',
+                                width: '100%',
+                                borderRadius: 1,
+                                overflow: 'hidden',
+                                bgcolor: 'background.paper',
+                                border: 1,
+                                borderColor: 'divider',
+                              }}
+                            >
+                              <iframe
+                                src={`https://open.spotify.com/embed/artist/${formData.spotifyArtistId}`}
+                                width="100%"
+                                height="100%"
+                                frameBorder="0"
+                                allowtransparency="true"
+                                allow="encrypted-media"
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  border: 0,
+                                }}
+                              />
+                            </Box>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Quick Facts</Typography>
+                      <Grid container spacing={2}>
+                        {['fact1', 'fact2', 'fact3'].map((factKey) => (
+                          <Grid item xs={12} key={factKey}>
+                            <TextField
+                              fullWidth
+                              label={`Fact ${factKey.slice(-1)}`}
+                              value={formData.quickFacts[factKey] || ''}
+                              onChange={(e) => handleQuickFactChange(factKey, e.target.value)}
+                            />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </TabPanel>
+
+              <Box sx={{ 
+                mt: 3,
+                display: 'flex',
+                gap: 2,
+                justifyContent: 'flex-end',
+                p: 2,
+                borderTop: 1,
+                borderColor: 'divider',
+              }}>
                 <Button 
                   variant="outlined" 
-                  onClick={() => navigate('/artist-list')}
+              onClick={() => navigate('/artist-list')}
                 >
                   Cancel
                 </Button>
@@ -448,15 +622,12 @@ function ArtistForm() {
                   type="submit" 
                   variant="contained" 
                   disabled={loading}
-                  startIcon={loading ? <CircularProgress size={20} /> : null}
                 >
-                  {artistId ? 'Update' : 'Create'} Artist
+              Save Changes
                 </Button>
               </Box>
-            </Grid>
-          </Grid>
-        </form>
-      </Paper>
+          </form>
+        </Paper>
     </>
   )
 }
